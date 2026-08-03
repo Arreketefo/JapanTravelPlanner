@@ -41,13 +41,10 @@ const formSchema = z.object({
     .max(100, "El concepto no puede tener más de 100 caracteres"),
   amountEur: z.string()
     .min(1, "Por favor ingresa un importe")
-    .transform((val) => {
+    .refine((val) => {
       const parsed = parseFloat(val);
-      if (isNaN(parsed)) throw new Error("El importe debe ser un número válido (por ejemplo: 10.50)");
-      if (parsed <= 0) throw new Error("El importe debe ser mayor que 0");
-      if (parsed > 100000) throw new Error("El importe parece demasiado alto. Si es correcto, por favor divide el gasto en partes más pequeñas.");
-      return parsed;
-    })
+      return Number.isFinite(parsed) && parsed > 0 && parsed <= 100000;
+    }, "Introduce un importe válido entre 0 y 100000")
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -71,7 +68,7 @@ export default function ExpensesSection() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const amountInYen = Math.floor(data.amountEur / YEN_TO_EUR);
+      const amountInYen = Math.floor(parseFloat(data.amountEur) / YEN_TO_EUR);
 
       const res = await apiRequest("POST", "/api/expenses", {
         concept: data.concept,

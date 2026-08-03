@@ -1,15 +1,14 @@
-import { IStorage } from "./types";
-import { User, InsertUser, Suggestion, InsertSuggestion, Vote, InsertVote, Expense, InsertExpense } from "@shared/schema";
+import { User, Suggestion, InsertSuggestion, Vote, InsertVote, Expense, InsertExpense } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import { endOfDay, startOfDay } from "date-fns";
+import { hashPassword } from "./passwords";
 
 const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(insertUser: InsertUser): Promise<User>;
   createSuggestion(userId: number, data: InsertSuggestion): Promise<Suggestion>;
   getSuggestionsByCity(city: string): Promise<Suggestion[]>;
   createVote(data: InsertVote): Promise<Vote>;
@@ -29,7 +28,7 @@ export class MemStorage implements IStorage {
   sessionStore: session.Store;
   currentId: number;
 
-  constructor() {
+  constructor(username: string, passwordHash: string) {
     this.users = new Map();
     this.suggestions = new Map();
     this.votes = new Map();
@@ -39,11 +38,11 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000,
     });
 
-    // Add predefined user
+    // The demo account is configured at runtime; no credential is stored in Git.
     this.users.set(1, {
       id: 1,
-      username: "Admin",
-      password: "14d7989d5dd624a00048be564cbb8d871282b9615a982b07d8f9bfbd8bc58ef3fb7074bfb82bbf787ddf60e1c2bdb7a18f79aa804eefa56f8fd855817b0a295f.bfb88908fd57f9427f8bb360f9f5157b"
+      username,
+      password: passwordHash,
     });
 
     // Add default suggestions
@@ -65,10 +64,6 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).find(
       (user) => user.username === username,
     );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    throw new Error("User creation is disabled");
   }
 
   async createSuggestion(userId: number, data: InsertSuggestion): Promise<Suggestion> {
@@ -109,6 +104,7 @@ export class MemStorage implements IStorage {
   async getVotesByUserAndDate(userId: number, date: Date): Promise<Vote[]> {
     return Array.from(this.votes.values()).filter(vote => 
       vote.userId === userId &&
+      vote.voteDate !== null &&
       vote.voteDate >= startOfDay(date) &&
       vote.voteDate <= endOfDay(date)
     );
@@ -536,4 +532,15 @@ const defaultSuggestions: Array<Omit<Suggestion, "id" | "userId" | "createdAt">>
   }
 ];
 
-export const storage = new MemStorage();
+const isProduction = process.env.NODE_ENV === "production";
+const configuredUsername = process.env.APP_USERNAME;
+const configuredPassword = process.env.APP_PASSWORD;
+
+if (isProduction && (!configuredUsername || !configuredPassword)) {
+  throw new Error("APP_USERNAME and APP_PASSWORD are required in production");
+}
+
+const username = configuredUsername || "demo";
+const password = configuredPassword || "local-demo-only";
+
+export const storage = new MemStorage(username, hashPassword(password));

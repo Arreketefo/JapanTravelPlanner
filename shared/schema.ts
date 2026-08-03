@@ -1,74 +1,87 @@
-import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+function isSafeHttpUrl(value: string): boolean {
+  if (value === "") return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export const citySchema = z.enum(["osaka", "kyoto", "tokyo"]);
+export const periodSchema = z.enum(["morning", "afternoon"]);
+
+export const userSchema = z.object({
+  id: z.number().int().positive(),
+  username: z.string().trim().min(1).max(64),
+  password: z.string().min(1),
 });
 
-export const suggestions = pgTable("suggestions", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  city: text("city").notNull(),
-  day: integer("day").notNull(),
-  period: text("period").notNull(), // 'morning' o 'afternoon'
-  placeName: text("place_name").notNull(),
-  description: text("description").notNull(),
-  link: text("link"),
-  isDefault: boolean("is_default").default(false),
-  order: integer("order").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const votes = pgTable("votes", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  suggestionId: integer("suggestion_id").notNull(),
-  voteDate: timestamp("vote_date").defaultNow(),
-});
-
-export const expenses = pgTable("expenses", {
-  id: serial("id").primaryKey(),
-  concept: text("concept").notNull(),
-  amount: integer("amount").notNull(), // en yenes
-  date: timestamp("date").defaultNow(),
-  userId: integer("user_id").notNull(),
-});
-
-export const insertUserSchema = createInsertSchema(users).pick({
+export const insertUserSchema = userSchema.pick({
   username: true,
   password: true,
+}).extend({
+  password: z.string().min(8, "Password must contain at least 8 characters"),
 });
 
-export const insertSuggestionSchema = createInsertSchema(suggestions)
+export const publicUserSchema = userSchema.omit({ password: true });
+
+export const suggestionSchema = z.object({
+  id: z.number().int().positive(),
+  userId: z.number().int().positive(),
+  city: citySchema,
+  day: z.number().int().min(1).max(31),
+  period: periodSchema,
+  placeName: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(600),
+  link: z.string().max(2048).nullable(),
+  isDefault: z.boolean(),
+  order: z.number().int().min(0),
+  createdAt: z.date().nullable(),
+});
+
+export const insertSuggestionSchema = suggestionSchema
   .omit({ id: true, userId: true, createdAt: true, isDefault: true })
   .extend({
-    city: z.enum(["osaka", "kyoto", "tokyo"]),
-    period: z.enum(["morning", "afternoon"]),
+    link: z
+      .string()
+      .max(2048)
+      .refine(isSafeHttpUrl, "Link must be an absolute HTTP or HTTPS URL")
+      .nullable()
+      .optional(),
   });
 
-export const insertVoteSchema = createInsertSchema(votes)
-  .omit({ id: true, voteDate: true });
+export const voteSchema = z.object({
+  id: z.number().int().positive(),
+  userId: z.number().int().positive(),
+  suggestionId: z.number().int().positive(),
+  voteDate: z.date().nullable(),
+});
 
-export const insertExpenseSchema = createInsertSchema(expenses)
-  .omit({ id: true, date: true, userId: true })
-  .extend({
-    amount: z.number().int("El importe debe ser un número entero")
-      .min(1, "El importe debe ser mayor que 0 yenes")
-      .describe("Importe en yenes"),
-    concept: z.string()
-      .min(1, "El concepto no puede estar vacío")
-      .max(100, "El concepto no puede tener más de 100 caracteres")
-      .describe("Concepto del gasto"),
-  });
+export const insertVoteSchema = voteSchema.omit({ id: true, voteDate: true });
+
+export const expenseSchema = z.object({
+  id: z.number().int().positive(),
+  concept: z.string().trim().min(1).max(100),
+  amount: z.number().int().positive(),
+  date: z.date().nullable(),
+  userId: z.number().int().positive(),
+});
+
+export const insertExpenseSchema = expenseSchema.omit({
+  id: true,
+  date: true,
+  userId: true,
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-export type Suggestion = typeof suggestions.$inferSelect;
-export type Vote = typeof votes.$inferSelect;
-export type Expense = typeof expenses.$inferSelect;
+export type User = z.infer<typeof userSchema>;
+export type PublicUser = z.infer<typeof publicUserSchema>;
+export type Suggestion = z.infer<typeof suggestionSchema>;
+export type Vote = z.infer<typeof voteSchema>;
+export type Expense = z.infer<typeof expenseSchema>;
 export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;

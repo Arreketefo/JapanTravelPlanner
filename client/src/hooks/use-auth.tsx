@@ -3,17 +3,16 @@ import {
   useQuery,
   useMutation,
 } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+import { PublicUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
-  user: SelectUser | null;
+  user: PublicUser | null;
   isLoading: boolean;
   error: Error | null;
   loginMutation: ReturnType<typeof useLoginMutation>;
   logoutMutation: ReturnType<typeof useLogoutMutation>;
-  registerMutation: ReturnType<typeof useRegisterMutation>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -30,37 +29,12 @@ const useLoginMutation = () => {
       }
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
+    onSuccess: (user: PublicUser) => {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (error: Error) => {
       toast({
         title: "Error al iniciar sesión",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-const useRegisterMutation = () => {
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-      return await res.json();
-    },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error al registrarse",
         description: error.message,
         variant: "destructive",
       });
@@ -98,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
-  } = useQuery<SelectUser | null>({
+  } = useQuery<PublicUser | null>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     staleTime: Infinity,
@@ -107,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useLoginMutation();
-  const registerMutation = useRegisterMutation();
   const logoutMutation = useLogoutMutation();
 
   return (
@@ -118,7 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         loginMutation,
         logoutMutation,
-        registerMutation,
       }}
     >
       {children}

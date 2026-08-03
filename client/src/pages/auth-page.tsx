@@ -44,7 +44,7 @@ export default function AuthPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <Home className="w-12 h-12 mx-auto text-primary mb-4" />
-            <CardTitle>Japan Trip Planner 2025</CardTitle>
+            <CardTitle>Japan Travel Planner</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>

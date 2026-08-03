@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { Document, Page, PDFDownloadLink, StyleSheet, Text, View } from '@react-pdf/renderer';
@@ -161,7 +160,7 @@ const PlanningPDF = ({
 }) => (
   <Document>
     <Page size="A4" style={styles.page}>
-      <Text style={styles.title}>Planning Viaje a Japón 2025</Text>
+      <Text style={styles.title}>Plan de viaje a Japón</Text>
 
       {/* Gastos */}
       <View style={styles.section}>
@@ -285,7 +284,7 @@ export default function DownloadPlanning() {
           totalExpenses={totalExpenses}
         />
       }
-      fileName="planning-japon-2025.pdf"
+      fileName="plan-viaje-japon.pdf"
     >
       {({ loading }) => (
         <Button disabled={loading}>
